@@ -1,0 +1,662 @@
+                            if savedC0Matrix and weld then
+                                weld.C0 = CFrame.new(table.unpack(savedC0Matrix))
+                            end
+                            
+                            if scaleTable and handle then
+                                applyScaleToPart(handle, scaleTable)
+                            end
+                            
+                            table.insert(activeAccessories, {
+                                id = tostring(assetId), 
+                                model = child, 
+                                part = handle,
+                                weld = weld
+                            })
+                        elseif child:IsA("BasePart") or child:IsA("MeshPart") then
+                            child.CanCollide = false
+                            child.Parent = char
+                            local weld = Instance.new("Weld")
+                            weld.Part0 = head
+                            weld.Part1 = child
+                            
+                            if savedC0Matrix then
+                                weld.C0 = CFrame.new(table.unpack(savedC0Matrix))
+                            else
+                                weld.C0 = CFrame.new(0, 0.5, 0)
+                            end
+                            weld.Parent = child
+                            
+                            if scaleTable then
+                                applyScaleToPart(child, scaleTable)
+                            end
+                            
+                            table.insert(activeAccessories, {
+                                id = tostring(assetId), 
+                                model = child, 
+                                part = child, 
+                                weld = weld
+                            })
+                        end
+                    end
+                end
+            end
+        end
+    end)
+    selectedIndex = #activeAccessories
+    updateStatusUI()
+end
+
+local function clearAllActiveAccessories()
+    for _, acc in ipairs(activeAccessories) do
+        if acc.model then
+            pcall(function()
+                acc.model:ClearAllChildren()
+                acc.model:Destroy()
+            end)
+        end
+    end
+    activeAccessories = {}
+    selectedIndex = 0
+    updateStatusUI()
+end
+
+local function savePresetsToDisk()
+    pcall(function()
+        if writefile then
+            writefile(PRESET_FILE_NAME, HttpService:JSONEncode(savedPresets))
+        end
+    end)
+end
+
+local function refreshPresetListUI()
+    for _, child in pairs(PresetScroll:GetChildren()) do
+        if child:IsA("Frame") then child:Destroy() end
+    end
+
+    local count = 0
+    for presetName, presetData in pairs(savedPresets) do
+        count = count + 1
+        local itemFrame = Instance.new("Frame")
+        itemFrame.Size = UDim2.new(1, -6, 0, 22)
+        itemFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
+        itemFrame.BorderSizePixel = 0
+        itemFrame.Parent = PresetScroll
+
+        local c = Instance.new("UICorner")
+        c.CornerRadius = UDim.new(0, 4)
+        c.Parent = itemFrame
+
+        local loadBtn = Instance.new("TextButton")
+        loadBtn.Size = UDim2.new(0.68, 0, 1, 0)
+        loadBtn.BackgroundTransparency = 1
+        loadBtn.Text = "  " .. presetName
+        loadBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        loadBtn.TextSize = 9
+        loadBtn.Font = Enum.Font.GothamMedium
+        loadBtn.TextXAlignment = Enum.TextXAlignment.Left
+        loadBtn.Parent = itemFrame
+
+        loadBtn.MouseButton1Click:Connect(function()
+            clearAllActiveAccessories()
+            for _, accInfo in ipairs(presetData) do
+                spawnAccessoryWithData(tonumber(accInfo.id), accInfo.c0, accInfo.scale)
+            end
+        end)
+
+        local delBtn = Instance.new("TextButton")
+        delBtn.Size = UDim2.new(0.28, 0, 0.8, 0)
+        delBtn.Position = UDim2.new(0.70, 0, 0.1, 0)
+        delBtn.BackgroundColor3 = Color3.fromRGB(50, 20, 20)
+        delBtn.BorderSizePixel = 0
+        delBtn.Text = "HAPUS"
+        delBtn.TextColor3 = Color3.fromRGB(255, 80, 80)
+        delBtn.TextSize = 8
+        delBtn.Font = Enum.Font.GothamBold
+        delBtn.Parent = itemFrame
+
+        local dc = Instance.new("UICorner")
+        dc.CornerRadius = UDim.new(0, 3)
+        dc.Parent = delBtn
+
+        delBtn.MouseButton1Click:Connect(function()
+            savedPresets[presetName] = nil
+            savePresetsToDisk()
+            refreshPresetListUI()
+        end)
+    end
+
+    PresetScroll.CanvasSize = UDim2.new(0, 0, 0, count * 24)
+end
+
+local function refreshCatalogUI()
+    for _, child in pairs(CatalogScroll:GetChildren()) do
+        if child:IsA("Frame") then child:Destroy() end
+    end
+
+    local count = 0
+    for _, item in ipairs(officialEffectItems) do
+        count = count + 1
+        local itemFrame = Instance.new("Frame")
+        itemFrame.Size = UDim2.new(1, -6, 0, 22)
+        itemFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
+        itemFrame.BorderSizePixel = 0
+        itemFrame.Parent = CatalogScroll
+
+        local c = Instance.new("UICorner")
+        c.CornerRadius = UDim.new(0, 4)
+        c.Parent = itemFrame
+
+        local loadBtn = Instance.new("TextButton")
+        loadBtn.Size = UDim2.new(1, 0, 1, 0)
+        loadBtn.BackgroundTransparency = 1
+        loadBtn.Text = "  " .. item.name
+        loadBtn.TextColor3 = Color3.fromRGB(255, 220, 100)
+        loadBtn.TextSize = 9
+        loadBtn.Font = Enum.Font.GothamMedium
+        loadBtn.TextXAlignment = Enum.TextXAlignment.Left
+        loadBtn.Parent = itemFrame
+
+        loadBtn.MouseButton1Click:Connect(function()
+            spawnAccessoryWithData(item.id, nil, nil)
+        end)
+    end
+
+    CatalogScroll.CanvasSize = UDim2.new(0, 0, 0, count * 25)
+end
+
+local function loadPresetsFromDisk()
+    pcall(function()
+        if readfile and isfile and isfile(PRESET_FILE_NAME) then
+            local data = readfile(PRESET_FILE_NAME)
+            local decoded = HttpService:JSONDecode(data)
+            if decoded and type(decoded) == "table" then
+                savedPresets = decoded
+            end
+        end
+    end)
+    refreshPresetListUI()
+end
+
+HeadlessBtn.MouseButton1Click:Connect(function()
+    HeadlessActive = not HeadlessActive
+    setHeadless(HeadlessActive)
+    HeadlessBtn.Text = HeadlessActive and "HEADLESS: ON" or "HEADLESS: OFF"
+    HeadlessBtn.TextColor3 = HeadlessActive and Color3.fromRGB(80, 255, 120) or Color3.fromRGB(255, 80, 80)
+end)
+
+AddAccessoryBtn.MouseButton1Click:Connect(function()
+    local textId = IdTextBox.Text
+    if textId ~= "" and tonumber(textId) then
+        spawnAccessoryWithData(tonumber(textId), nil, nil)
+        IdTextBox.Text = ""
+    end
+end)
+
+SavePresetBtn.MouseButton1Click:Connect(function()
+    local pName = PresetNameBox.Text
+    if pName ~= "" and #activeAccessories > 0 then
+        local presetData = {}
+        for _, acc in ipairs(activeAccessories) do
+            local c0Data = nil
+            if acc.weld and acc.weld:IsA("Weld") then
+                c0Data = {acc.weld.C0:GetComponents()}
+            end
+            
+            local scaleComp = nil
+            if acc.part then
+                local mesh = acc.part:FindFirstChildOfClass("SpecialMesh")
+                if mesh then
+                    scaleComp = {mesh.Scale.X, mesh.Scale.Y, mesh.Scale.Z}
+                elseif acc.part:IsA("MeshPart") then
+                    scaleComp = {acc.part.Size.X, acc.part.Size.Y, acc.part.Size.Z}
+                end
+            end
+            
+            table.insert(presetData, {
+                id = acc.id,
+                c0 = c0Data,
+                scale = scaleComp
+            })
+        end
+        savedPresets[pName] = presetData
+        savePresetsToDisk()
+        refreshPresetListUI()
+        PresetNameBox.Text = ""
+    end
+end)
+
+PrevAccBtn.MouseButton1Click:Connect(function()
+    if #activeAccessories > 0 then
+        selectedIndex = selectedIndex - 1
+        if selectedIndex < 1 then selectedIndex = #activeAccessories end
+        updateStatusUI()
+    end
+end)
+
+NextAccBtn.MouseButton1Click:Connect(function()
+    if #activeAccessories > 0 then
+        selectedIndex = selectedIndex + 1
+        if selectedIndex > #activeAccessories then selectedIndex = 1 end
+        updateStatusUI()
+    end
+end)
+
+local function applyC0Offset(dx, dy, dz)
+    if selectedIndex > 0 and activeAccessories[selectedIndex] then
+        local entry = activeAccessories[selectedIndex]
+        if entry.weld and entry.weld:IsA("Weld") then
+            entry.weld.C0 = entry.weld.C0 * CFrame.new(dx, dy, dz)
+        end
+    end
+end
+
+XPlusBtn.MouseButton1Click:Connect(function() applyC0Offset(0.1, 0, 0) end)
+XMinBtn.MouseButton1Click:Connect(function() applyC0Offset(-0.1, 0, 0) end)
+YPlusBtn.MouseButton1Click:Connect(function() applyC0Offset(0, 0.1, 0) end)
+YMinBtn.MouseButton1Click:Connect(function() applyC0Offset(0, -0.1, 0) end)
+ZPlusBtn.MouseButton1Click:Connect(function() applyC0Offset(0, 0, 0.1) end)
+ZMinBtn.MouseButton1Click:Connect(function() applyC0Offset(0, 0, -0.1) end)
+
+ScaleUpBtn.MouseButton1Click:Connect(function()
+    if selectedIndex > 0 and activeAccessories[selectedIndex] then
+        local entry = activeAccessories[selectedIndex]
+        if entry.part then
+            local mesh = entry.part:FindFirstChildOfClass("SpecialMesh")
+            if mesh then mesh.Scale = mesh.Scale * 1.1 elseif entry.part:IsA("MeshPart") then entry.part.Size = entry.part.Size * 1.1 end
+        end
+    end
+end)
+
+ScaleDownBtn.MouseButton1Click:Connect(function()
+    if selectedIndex > 0 and activeAccessories[selectedIndex] then
+        local entry = activeAccessories[selectedIndex]
+        if entry.part then
+            local mesh = entry.part:FindFirstChildOfClass("SpecialMesh")
+            if mesh then mesh.Scale = mesh.Scale * 0.9 elseif entry.part:IsA("MeshPart") then entry.part.Size = entry.part.Size * 0.9 end
+        end
+    end
+end)
+
+DeleteAccBtn.MouseButton1Click:Connect(function()
+    if selectedIndex > 0 and activeAccessories[selectedIndex] then
+        local entry = activeAccessories[selectedIndex]
+        if entry.model then
+            pcall(function()
+                entry.model:ClearAllChildren()
+                entry.model:Destroy()
+            end)
+        end
+        table.remove(activeAccessories, selectedIndex)
+        if selectedIndex > #activeAccessories then selectedIndex = #activeAccessories end
+        updateStatusUI()
+    end
+end)
+
+-- Persistent Auto-Reapply System on Respawn / Reset
+LocalPlayer.CharacterAdded:Connect(function(newChar)
+    task.wait(1.2)
+    if HeadlessActive then
+        setHeadless(true)
+    end
+    
+    local snapshot = {}
+    for _, acc in ipairs(activeAccessories) do
+        local c0Data = nil
+        if acc.weld and acc.weld:IsA("Weld") then
+            c0Data = {acc.weld.C0:GetComponents()}
+        end
+        
+        local scaleComp = nil
+        if acc.part then
+            local mesh = acc.part:FindFirstChildOfClass("SpecialMesh")
+            if mesh then
+                scaleComp = {mesh.Scale.X, mesh.Scale.Y, mesh.Scale.Z}
+            elseif acc.part:IsA("MeshPart") then
+                scaleComp = {acc.part.Size.X, acc.part.Size.Y, acc.part.Size.Z}
+            end
+        end
+        table.insert(snapshot, {id = acc.id, c0 = c0Data, scale = scaleComp})
+    end
+    
+    activeAccessories = {}
+    selectedIndex = 0
+    updateStatusUI()
+    
+    for _, item in ipairs(snapshot) do
+        spawnAccessoryWithData(tonumber(item.id), item.c0, item.scale)
+    end
+end)
+
+loadPresetsFromDisk()
+refreshCatalogUI()
+                            if savedC0Matrix and weld then
+                                weld.C0 = CFrame.new(table.unpack(savedC0Matrix))
+                            end
+                            
+                            if scaleTable and handle then
+                                applyScaleToPart(handle, scaleTable)
+                            end
+                            
+                            table.insert(activeAccessories, {
+                                id = tostring(assetId), 
+                                model = child, 
+                                part = handle,
+                                weld = weld
+                            })
+                        elseif child:IsA("BasePart") or child:IsA("MeshPart") then
+                            child.CanCollide = false
+                            child.Parent = char
+                            local weld = Instance.new("Weld")
+                            weld.Part0 = head
+                            weld.Part1 = child
+                            
+                            if savedC0Matrix then
+                                weld.C0 = CFrame.new(table.unpack(savedC0Matrix))
+                            else
+                                weld.C0 = CFrame.new(0, 0.5, 0)
+                            end
+                            weld.Parent = child
+                            
+                            if scaleTable then
+                                applyScaleToPart(child, scaleTable)
+                            end
+                            
+                            table.insert(activeAccessories, {
+                                id = tostring(assetId), 
+                                model = child, 
+                                part = child, 
+                                weld = weld
+                            })
+                        end
+                    end
+                end
+            end
+        end
+    end)
+    selectedIndex = #activeAccessories
+    updateStatusUI()
+end
+
+local function clearAllActiveAccessories()
+    for _, acc in ipairs(activeAccessories) do
+        if acc.model then
+            pcall(function()
+                acc.model:ClearAllChildren()
+                acc.model:Destroy()
+            end)
+        end
+    end
+    activeAccessories = {}
+    selectedIndex = 0
+    updateStatusUI()
+end
+
+local function savePresetsToDisk()
+    pcall(function()
+        if writefile then
+            writefile(PRESET_FILE_NAME, HttpService:JSONEncode(savedPresets))
+        end
+    end)
+end
+
+local function refreshPresetListUI()
+    for _, child in pairs(PresetScroll:GetChildren()) do
+        if child:IsA("Frame") then child:Destroy() end
+    end
+
+    local count = 0
+    for presetName, presetData in pairs(savedPresets) do
+        count = count + 1
+        local itemFrame = Instance.new("Frame")
+        itemFrame.Size = UDim2.new(1, -6, 0, 22)
+        itemFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
+        itemFrame.BorderSizePixel = 0
+        itemFrame.Parent = PresetScroll
+
+        local c = Instance.new("UICorner")
+        c.CornerRadius = UDim.new(0, 4)
+        c.Parent = itemFrame
+
+        local loadBtn = Instance.new("TextButton")
+        loadBtn.Size = UDim2.new(0.68, 0, 1, 0)
+        loadBtn.BackgroundTransparency = 1
+        loadBtn.Text = "  " .. presetName
+        loadBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        loadBtn.TextSize = 9
+        loadBtn.Font = Enum.Font.GothamMedium
+        loadBtn.TextXAlignment = Enum.TextXAlignment.Left
+        loadBtn.Parent = itemFrame
+
+        loadBtn.MouseButton1Click:Connect(function()
+            clearAllActiveAccessories()
+            for _, accInfo in ipairs(presetData) do
+                spawnAccessoryWithData(tonumber(accInfo.id), accInfo.c0, accInfo.scale)
+            end
+        end)
+
+        local delBtn = Instance.new("TextButton")
+        delBtn.Size = UDim2.new(0.28, 0, 0.8, 0)
+        delBtn.Position = UDim2.new(0.70, 0, 0.1, 0)
+        delBtn.BackgroundColor3 = Color3.fromRGB(50, 20, 20)
+        delBtn.BorderSizePixel = 0
+        delBtn.Text = "HAPUS"
+        delBtn.TextColor3 = Color3.fromRGB(255, 80, 80)
+        delBtn.TextSize = 8
+        delBtn.Font = Enum.Font.GothamBold
+        delBtn.Parent = itemFrame
+
+        local dc = Instance.new("UICorner")
+        dc.CornerRadius = UDim.new(0, 3)
+        dc.Parent = delBtn
+
+        delBtn.MouseButton1Click:Connect(function()
+            savedPresets[presetName] = nil
+            savePresetsToDisk()
+            refreshPresetListUI()
+        end)
+    end
+
+    PresetScroll.CanvasSize = UDim2.new(0, 0, 0, count * 24)
+end
+
+local function refreshCatalogUI()
+    for _, child in pairs(CatalogScroll:GetChildren()) do
+        if child:IsA("Frame") then child:Destroy() end
+    end
+
+    local count = 0
+    for _, item in ipairs(officialEffectItems) do
+        count = count + 1
+        local itemFrame = Instance.new("Frame")
+        itemFrame.Size = UDim2.new(1, -6, 0, 22)
+        itemFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
+        itemFrame.BorderSizePixel = 0
+        itemFrame.Parent = CatalogScroll
+
+        local c = Instance.new("UICorner")
+        c.CornerRadius = UDim.new(0, 4)
+        c.Parent = itemFrame
+
+        local loadBtn = Instance.new("TextButton")
+        loadBtn.Size = UDim2.new(1, 0, 1, 0)
+        loadBtn.BackgroundTransparency = 1
+        loadBtn.Text = "  " .. item.name
+        loadBtn.TextColor3 = Color3.fromRGB(255, 220, 100)
+        loadBtn.TextSize = 9
+        loadBtn.Font = Enum.Font.GothamMedium
+        loadBtn.TextXAlignment = Enum.TextXAlignment.Left
+        loadBtn.Parent = itemFrame
+
+        loadBtn.MouseButton1Click:Connect(function()
+            spawnAccessoryWithData(item.id, nil, nil)
+        end)
+    end
+
+    CatalogScroll.CanvasSize = UDim2.new(0, 0, 0, count * 25)
+end
+
+local function loadPresetsFromDisk()
+    pcall(function()
+        if readfile and isfile and isfile(PRESET_FILE_NAME) then
+            local data = readfile(PRESET_FILE_NAME)
+            local decoded = HttpService:JSONDecode(data)
+            if decoded and type(decoded) == "table" then
+                savedPresets = decoded
+            end
+        end
+    end)
+    refreshPresetListUI()
+end
+
+HeadlessBtn.MouseButton1Click:Connect(function()
+    HeadlessActive = not HeadlessActive
+    setHeadless(HeadlessActive)
+    HeadlessBtn.Text = HeadlessActive and "HEADLESS: ON" or "HEADLESS: OFF"
+    HeadlessBtn.TextColor3 = HeadlessActive and Color3.fromRGB(80, 255, 120) or Color3.fromRGB(255, 80, 80)
+end)
+
+AddAccessoryBtn.MouseButton1Click:Connect(function()
+    local textId = IdTextBox.Text
+    if textId ~= "" and tonumber(textId) then
+        spawnAccessoryWithData(tonumber(textId), nil, nil)
+        IdTextBox.Text = ""
+    end
+end)
+
+SavePresetBtn.MouseButton1Click:Connect(function()
+    local pName = PresetNameBox.Text
+    if pName ~= "" and #activeAccessories > 0 then
+        local presetData = {}
+        for _, acc in ipairs(activeAccessories) do
+            local c0Data = nil
+            if acc.weld and acc.weld:IsA("Weld") then
+                c0Data = {acc.weld.C0:GetComponents()}
+            end
+            
+            local scaleComp = nil
+            if acc.part then
+                local mesh = acc.part:FindFirstChildOfClass("SpecialMesh")
+                if mesh then
+                    scaleComp = {mesh.Scale.X, mesh.Scale.Y, mesh.Scale.Z}
+                elseif acc.part:IsA("MeshPart") then
+                    scaleComp = {acc.part.Size.X, acc.part.Size.Y, acc.part.Size.Z}
+                end
+            end
+            
+            table.insert(presetData, {
+                id = acc.id,
+                c0 = c0Data,
+                scale = scaleComp
+            })
+        end
+        savedPresets[pName] = presetData
+        savePresetsToDisk()
+        refreshPresetListUI()
+        PresetNameBox.Text = ""
+    end
+end)
+
+PrevAccBtn.MouseButton1Click:Connect(function()
+    if #activeAccessories > 0 then
+        selectedIndex = selectedIndex - 1
+        if selectedIndex < 1 then selectedIndex = #activeAccessories end
+        updateStatusUI()
+    end
+end)
+
+NextAccBtn.MouseButton1Click:Connect(function()
+    if #activeAccessories > 0 then
+        selectedIndex = selectedIndex + 1
+        if selectedIndex > #activeAccessories then selectedIndex = 1 end
+        updateStatusUI()
+    end
+end)
+
+local function applyC0Offset(dx, dy, dz)
+    if selectedIndex > 0 and activeAccessories[selectedIndex] then
+        local entry = activeAccessories[selectedIndex]
+        if entry.weld and entry.weld:IsA("Weld") then
+            entry.weld.C0 = entry.weld.C0 * CFrame.new(dx, dy, dz)
+        end
+    end
+end
+
+XPlusBtn.MouseButton1Click:Connect(function() applyC0Offset(0.1, 0, 0) end)
+XMinBtn.MouseButton1Click:Connect(function() applyC0Offset(-0.1, 0, 0) end)
+YPlusBtn.MouseButton1Click:Connect(function() applyC0Offset(0, 0.1, 0) end)
+YMinBtn.MouseButton1Click:Connect(function() applyC0Offset(0, -0.1, 0) end)
+ZPlusBtn.MouseButton1Click:Connect(function() applyC0Offset(0, 0, 0.1) end)
+ZMinBtn.MouseButton1Click:Connect(function() applyC0Offset(0, 0, -0.1) end)
+
+ScaleUpBtn.MouseButton1Click:Connect(function()
+    if selectedIndex > 0 and activeAccessories[selectedIndex] then
+        local entry = activeAccessories[selectedIndex]
+        if entry.part then
+            local mesh = entry.part:FindFirstChildOfClass("SpecialMesh")
+            if mesh then mesh.Scale = mesh.Scale * 1.1 elseif entry.part:IsA("MeshPart") then entry.part.Size = entry.part.Size * 1.1 end
+        end
+    end
+end)
+
+ScaleDownBtn.MouseButton1Click:Connect(function()
+    if selectedIndex > 0 and activeAccessories[selectedIndex] then
+        local entry = activeAccessories[selectedIndex]
+        if entry.part then
+            local mesh = entry.part:FindFirstChildOfClass("SpecialMesh")
+            if mesh then mesh.Scale = mesh.Scale * 0.9 elseif entry.part:IsA("MeshPart") then entry.part.Size = entry.part.Size * 0.9 end
+        end
+    end
+end)
+
+DeleteAccBtn.MouseButton1Click:Connect(function()
+    if selectedIndex > 0 and activeAccessories[selectedIndex] then
+        local entry = activeAccessories[selectedIndex]
+        if entry.model then
+            pcall(function()
+                entry.model:ClearAllChildren()
+                entry.model:Destroy()
+            end)
+        end
+        table.remove(activeAccessories, selectedIndex)
+        if selectedIndex > #activeAccessories then selectedIndex = #activeAccessories end
+        updateStatusUI()
+    end
+end)
+
+-- Persistent Auto-Reapply System on Respawn / Reset
+LocalPlayer.CharacterAdded:Connect(function(newChar)
+    task.wait(1.2)
+    if HeadlessActive then
+        setHeadless(true)
+    end
+    
+    local snapshot = {}
+    for _, acc in ipairs(activeAccessories) do
+        local c0Data = nil
+        if acc.weld and acc.weld:IsA("Weld") then
+            c0Data = {acc.weld.C0:GetComponents()}
+        end
+        
+        local scaleComp = nil
+        if acc.part then
+            local mesh = acc.part:FindFirstChildOfClass("SpecialMesh")
+            if mesh then
+                scaleComp = {mesh.Scale.X, mesh.Scale.Y, mesh.Scale.Z}
+            elseif acc.part:IsA("MeshPart") then
+                scaleComp = {acc.part.Size.X, acc.part.Size.Y, acc.part.Size.Z}
+            end
+        end
+        table.insert(snapshot, {id = acc.id, c0 = c0Data, scale = scaleComp})
+    end
+    
+    activeAccessories = {}
+    selectedIndex = 0
+    updateStatusUI()
+    
+    for _, item in ipairs(snapshot) do
+        spawnAccessoryWithData(tonumber(item.id), item.c0, item.scale)
+    end
+end)
+
+loadPresetsFromDisk()
+refreshCatalogUI()
